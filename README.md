@@ -1,2 +1,3 @@
 # cordex-aws-etl
-EURO-CORDEX AWS transform and loading
+
+EURO-CORDEX transform and loading from ESGF to S3.

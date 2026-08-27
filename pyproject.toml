@@ -1,0 +1,36 @@
+[project]
+name = "cordex-etl"
+dynamic = ["version", "dependencies"]
+
+[project.urls]
+repository = "https://github.com/euro-cordex/cordex-etl.git"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "isort",
+    "polars<1.33" # https://github.com/intake/intake-esm/issues/744
+]
+
+[build-system]
+requires = [
+    "setuptools>=42",
+    "setuptools-scm>=7",
+    "setuptools_scm_git_archive",
+]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["cordex_etl"]
+
+[tool.setuptools_scm]
+fallback_version = "999"
+version_scheme = "no-guess-dev"
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.pytest]
+python_files = ["test_*.py"]
+testpaths = ["cordex_etl/tests"]
