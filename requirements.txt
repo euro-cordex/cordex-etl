@@ -3,3 +3,8 @@ pandas
 aiohttp
 requests
 pystac_client
+xarray>=2025.3.1
+zarr>=3
+dask[array]
+netCDF4
+cftime
