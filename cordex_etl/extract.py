@@ -228,6 +228,24 @@ def get_items(url=None, collection=None, add_fx=None, **kwargs):
     return iter({item.id: item for item in temporal_items + fx_items}.values())
 
 
+def _cql_filter(prefix, conditions):
+    """Build a CQL2-JSON equality filter; the servers ignore the QUERY extension."""
+    args = [
+        {"op": "=", "args": [{"property": f"{prefix}:{key}"}, value]}
+        for key, value in conditions.items()
+    ]
+    if not args:
+        return None
+    return args[0] if len(args) == 1 else {"op": "and", "args": args}
+
+
+def _search(catalog, collection, prefix, conditions):
+    cql = _cql_filter(prefix, conditions)
+    if cql is None:
+        return catalog.search(collections=[collection])
+    return catalog.search(collections=[collection], filter=cql, filter_lang="cql2-json")
+
+
 def _search_items(catalog, collection, kwargs):
     all_items = {}  # Deduplicate by item id
 
@@ -235,31 +253,19 @@ def _search_items(catalog, collection, kwargs):
     list_kwargs = {k: v for k, v in kwargs.items() if isinstance(v, list)}
     scalar_kwargs = {k: v for k, v in kwargs.items() if not isinstance(v, list)}
 
+    prefix = collection.lower()
+
     # If no list kwargs, single query
     if not list_kwargs:
-        query = {
-            f"{collection.lower()}:{key}": {"eq": value}
-            for key, value in scalar_kwargs.items()
-        }
-        search = catalog.search(collections=[collection], query=query)
-        return search.get_items()
+        return _search(catalog, collection, prefix, scalar_kwargs).get_items()
 
     # For list kwargs: generate all combinations and query each
     keys = list(list_kwargs.keys())
-
-    # Generate all combinations
     combinations = product(*[list_kwargs[k] for k in keys])
 
     for combo in combinations:
-        query = {f"{collection.lower()}:{k}": {"eq": v} for k, v in zip(keys, combo)}
-
-        # Add scalar kwargs
-        for key, value in scalar_kwargs.items():
-            query[f"{collection.lower()}:{key}"] = {"eq": value}
-
-        # Execute query
-        search = catalog.search(collections=[collection], query=query)
-        for item in search.get_items():
+        conditions = {**dict(zip(keys, combo)), **scalar_kwargs}
+        for item in _search(catalog, collection, prefix, conditions).get_items():
             all_items[item.id] = item
 
     return iter(all_items.values())

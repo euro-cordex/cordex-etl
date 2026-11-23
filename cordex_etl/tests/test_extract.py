@@ -34,13 +34,22 @@ def item(identifier, variable="tas", frequency="mon", publication="v20260914",
     )
 
 
+def conditions(cql):
+    if cql is None:
+        return {}
+    nodes = cql["args"] if cql["op"] == "and" else [cql]
+    assert all(node["op"] == "=" for node in nodes)
+    return {node["args"][0]["property"]: node["args"][1] for node in nodes}
+
+
 def catalog(monkeypatch, items):
     client = Mock()
 
-    def search(*, collections, query):
+    def search(*, collections, filter=None, filter_lang=None):
+        query = conditions(filter)
         matching = [
             entry for entry in items
-            if all(entry.properties.get(key) == value["eq"]
+            if all(entry.properties.get(key) == value
                    for key, value in query.items())
         ]
         return SimpleNamespace(get_items=lambda: iter(matching))
@@ -121,13 +130,13 @@ def test_discovery_fetches_selected_fx_and_preserves_filters(monkeypatch):
     ))
     assert entries == [mon, day, fx]
     opener.assert_called_once_with("https://catalog.example")
-    queries = [call.kwargs["query"] for call in client.search.call_args_list]
+    queries = [conditions(call.kwargs["filter"]) for call in client.search.call_args_list]
     assert len(queries) == 3
     assert queries[-1] == {
-        PREFIX + "domain_id": {"eq": "EUR-12"},
-        PREFIX + "driving_experiment_id": {"eq": "historical"},
-        PREFIX + "frequency": {"eq": "fx"},
-        PREFIX + "variable_id": {"eq": "orog"},
+        PREFIX + "domain_id": "EUR-12",
+        PREFIX + "driving_experiment_id": "historical",
+        PREFIX + "frequency": "fx",
+        PREFIX + "variable_id": "orog",
     }
     assert list(group_items_by_attributes(entries, merge_fx=True).values()) == [
         [mon, fx], [day, fx]
@@ -141,7 +150,9 @@ def test_add_fx_true_discovers_all_variables(monkeypatch):
     assert list(get_items(variable_id="tas", frequency="mon", add_fx=True)) == [
         mon, orog, sftlf
     ]
-    assert PREFIX + "variable_id" not in client.search.call_args.kwargs["query"]
+    assert PREFIX + "variable_id" not in conditions(
+        client.search.call_args.kwargs["filter"]
+    )
 
 
 def test_missing_fields_warn_once_per_simulation(monkeypatch):
@@ -275,3 +286,12 @@ def test_stac_metadata_disagreement_raises(attribute):
     entry.properties[PREFIX + attribute] = "different"
     with pytest.raises(ValueError, match="disagree"):
         group_items_by_attributes([entry])
+
+
+def test_search_uses_cql2_filter(monkeypatch):
+    client, _ = catalog(monkeypatch, [])
+    list(get_items(domain_id="EUR-12", frequency="mon"))
+    kwargs = client.search.call_args.kwargs
+    assert "query" not in kwargs
+    assert kwargs["filter_lang"] == "cql2-json"
+    assert kwargs["filter"]["op"] == "and"
