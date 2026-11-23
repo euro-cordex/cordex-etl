@@ -45,6 +45,66 @@ def assert_values_equal(left, right, name):
         raise ValueError(f"Values differ for {name!r}")
 
 
+_VERTICAL_NAMES = {"height", "plev", "depth", "lev", "level", "altitude"}
+
+
+def _is_scalar_vertical(dataset, name):
+    coord = dataset[name]
+    return (
+        coord.ndim == 0
+        and name not in dataset.dims
+        and (
+            name in _VERTICAL_NAMES
+            or coord.attrs.get("axis") == "Z"
+            or "positive" in coord.attrs
+        )
+    )
+
+
+def _vertical_name(dataset, name):
+    coord = dataset[name]
+    units = re.sub(r"\W", "", str(coord.attrs.get("units", "")))
+    return f"{name}{float(coord.values):g}{units}"
+
+
+def _same_scalar(left, right):
+    return bool(left.values == right.values)
+
+
+def rename_conflicting_vertical(incoming, existing):
+    """Rename scalar vertical coordinates whose value differs from the store's.
+
+    A store can hold only one scalar coordinate per name, so a conflicting one
+    (e.g. height 10 m next to height 2 m) becomes name+value+units (height10m)
+    and the CF references of the incoming variables follow. Equal values keep
+    the shared name and are validated as before.
+    """
+    renames = {}
+    for name in incoming.coords:
+        if (
+            name in existing.variables
+            and _is_scalar_vertical(incoming, name)
+            and not _same_scalar(incoming[name], existing[name])
+        ):
+            new = _vertical_name(incoming, name)
+            if new in incoming.variables or (
+                new in existing.variables
+                and not _same_scalar(incoming[name], existing[new])
+            ):
+                raise ValueError(f"Cannot rename {name!r} to taken name {new!r}")
+            renames[name] = new
+    if not renames:
+        return incoming
+    renamed = incoming.rename(renames)
+    for name in renamed.variables:
+        for container in (renamed[name].encoding, renamed[name].attrs):
+            if "coordinates" in container:
+                container["coordinates"] = " ".join(
+                    renames.get(ref, ref) for ref in container["coordinates"].split()
+                )
+    return renamed
+
+
 def validate_shared(incoming, existing):
     """Reject implicit alignment or replacement of any existing shared array."""
     print(incoming)

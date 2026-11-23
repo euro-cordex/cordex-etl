@@ -7,7 +7,11 @@ import tempfile
 
 import xarray as xr
 
-from .transform import assert_values_equal, validate_shared
+from .transform import (
+    assert_values_equal,
+    rename_conflicting_vertical,
+    validate_shared,
+)
 
 
 def write_json(path, value):
@@ -102,6 +106,7 @@ def write_variable(dataset, variable, store, pending_path, chunks=None):
             store, consolidated=False, chunks={}, decode_coords="all"
         ) as existing:
             # A requested field can already be a committed dependency of another item.
+            dataset = rename_conflicting_vertical(dataset, existing)
             validate_shared(dataset, existing)
             shared = set(dataset.variables) & set(existing.variables)
             global_attrs = dict(existing.attrs)

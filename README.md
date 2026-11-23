@@ -129,6 +129,17 @@ removed manually.
 The existing Docker entrypoint accepts the same arguments; mount writable local
 volumes for output and scratch.
 
+### Scalar vertical coordinates
+
+Variables measured at different levels (for example `tas` at 2 m and `sfcWind`
+at 10 m) carry a scalar `height` coordinate with different values. The first
+variable keeps the name; a later variable whose value differs gets the
+coordinate renamed to name + value + units (`height10m`, `plev850Pa`) and its
+CF `coordinates` reference is updated. Equal values stay shared and are
+validated. The naming therefore depends on ingest order; all scalar vertical
+coordinates (height, plev, depth, lev, level, altitude, or axis `Z` /
+`positive`) are handled. Bounds of scalar vertical coordinates are not renamed.
+
 ### Checkpoints and restarts
 
 For each dataset ID, the output directory contains:
