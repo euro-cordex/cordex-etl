@@ -47,6 +47,8 @@ def assert_values_equal(left, right, name):
 
 def validate_shared(incoming, existing):
     """Reject implicit alignment or replacement of any existing shared array."""
+    print(incoming)
+    print(existing)
     for name, size in incoming.sizes.items():
         if name in existing.sizes and size != existing.sizes[name]:
             raise ValueError(f"Dimension size differs for {name!r}")
@@ -71,4 +73,10 @@ def validate_shared(incoming, existing):
         if _references(left) != _references(right):
             raise ValueError(f"CF references differ for shared array {name!r}")
         if left.encoding.get("calendar") != right.encoding.get("calendar"):
-            raise ValueError(f"Calendar differs for shared array {name!r}")
+            raise ValueError(
+                f"Calendar differs for shared array {name!r}: incoming="
+                f"{left.encoding.get('calendar')!r} (units="
+                f"{left.encoding.get('units')!r}, dtype={left.dtype}), existing="
+                f"{right.encoding.get('calendar')!r} (units="
+                f"{right.encoding.get('units')!r}, dtype={right.dtype})"
+            )

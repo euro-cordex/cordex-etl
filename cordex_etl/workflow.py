@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 from pathlib import Path
+import shutil
 import tempfile
 from urllib.parse import urlsplit
 
@@ -56,7 +57,9 @@ def _source_record(item, assets):
     return {"item_id": item.id, "fingerprint": fingerprint, "assets": source["assets"]}
 
 
-def ingest_groups(groups, output_dir, scratch_dir=None, chunks=None):
+def ingest_groups(
+    groups, output_dir, scratch_dir=None, chunks=None, keep_scratch=False
+):
     """Ingest default STAC-ID groups into one local Zarr v3 store per group.
 
     Only mon/day groups with identical shared coordinates are supported.
@@ -64,6 +67,8 @@ def ingest_groups(groups, output_dir, scratch_dir=None, chunks=None):
     Unchanged committed sources are skipped. Changed sources, partial writes,
     and untracked stores raise instead of overwriting data. Run only one writer
     per store; lock files left by a killed process require explicit inspection.
+    With keep_scratch, the scratch directory of an item that fails is left in
+    place for debugging (its path is logged); successful items are still cleaned.
 
     Returns a mapping of dataset IDs to their local Zarr paths.
     """
@@ -163,9 +168,8 @@ def ingest_groups(groups, output_dir, scratch_dir=None, chunks=None):
                     logger.info("Skipping verified item %s", item.id)
                     continue
                 logger.info("Ingesting %s", item.id)
-                with tempfile.TemporaryDirectory(
-                    dir=scratch_dir, prefix="cordex-etl-"
-                ) as scratch:
+                scratch = tempfile.mkdtemp(dir=scratch_dir, prefix="cordex-etl-")
+                try:
                     files = download_item_assets(
                         item,
                         output_dir=scratch,
@@ -219,6 +223,13 @@ def ingest_groups(groups, output_dir, scratch_dir=None, chunks=None):
                     }
                     write_json(manifest_path, manifest)
                     pending.unlink()
+                except BaseException:
+                    if keep_scratch:
+                        logger.error("Keeping scratch directory %s", scratch)
+                        raise
+                    shutil.rmtree(scratch, ignore_errors=True)
+                    raise
+                shutil.rmtree(scratch, ignore_errors=True)
             manifest["status"] = "complete"
             manifest["completed_at"] = _now()
             write_json(manifest_path, manifest)

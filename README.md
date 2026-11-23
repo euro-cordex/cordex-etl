@@ -121,6 +121,11 @@ python jobs/etl.py \
   --chunk time=120
 ```
 
+Add `--keep-scratch` (Python: `keep_scratch=True`) to leave the downloaded
+files of a failing item in the scratch directory for debugging; the path is
+logged. Successful items are still cleaned, and kept directories must be
+removed manually.
+
 The existing Docker entrypoint accepts the same arguments; mount writable local
 volumes for output and scratch.
 

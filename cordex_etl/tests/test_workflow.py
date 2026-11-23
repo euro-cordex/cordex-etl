@@ -194,6 +194,23 @@ def test_coordinate_mismatch_rejected_before_write(source, tmp_path):
         assert "pr" not in ds
 
 
+def test_keep_scratch_preserves_failed_item_only(source, tmp_path):
+    item = make_item(source)
+    source[0].joinpath("tas-v20260914-0.nc").unlink()
+    output, scratch = tmp_path / "out", tmp_path / "scratch"
+    with pytest.raises(requests.HTTPError):
+        ingest_groups(groups(item), output, scratch, keep_scratch=True)
+    assert len(list(scratch.iterdir())) == 1
+
+
+def test_keep_scratch_cleans_successful_items(source, tmp_path):
+    scratch = tmp_path / "scratch"
+    ingest_groups(
+        groups(make_item(source)), tmp_path / "out", scratch, keep_scratch=True
+    )
+    assert list(scratch.iterdir()) == []
+
+
 def test_changed_publication_rejected_without_download(source, tmp_path):
     output = tmp_path / "out"
     ingest_groups(groups(make_item(source)), output)

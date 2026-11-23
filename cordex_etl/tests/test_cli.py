@@ -48,6 +48,7 @@ def test_ingestion_cli_wires_output_scratch_and_chunks(monkeypatch, capsys, tmp_
             str(tmp_path / "scratch"),
             "--chunk",
             "time=12",
+            "--keep-scratch",
         ],
     )
     from cordex_etl import workflow
@@ -61,6 +62,7 @@ def test_ingestion_cli_wires_output_scratch_and_chunks(monkeypatch, capsys, tmp_
         str(tmp_path),
         scratch_dir=str(tmp_path / "scratch"),
         chunks={"time": 12},
+        keep_scratch=True,
     )
     assert "dataset.zarr" in capsys.readouterr().out
 

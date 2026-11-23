@@ -42,6 +42,11 @@ def main():
     )
     parser.add_argument("--scratch-dir", help="Temporary source download directory")
     parser.add_argument(
+        "--keep-scratch",
+        action="store_true",
+        help="Keep the downloaded files of a failed item for debugging",
+    )
+    parser.add_argument(
         "--chunk", action="append", type=chunk_spec, default=[], metavar="DIM=SIZE"
     )
     args = parser.parse_args()
@@ -49,8 +54,10 @@ def main():
         parser.error("--output-dir is required with --ingest")
     if args.ingest and any(value not in ("mon", "day") for value in args.frequency):
         parser.error("--ingest currently supports only mon/day frequencies")
-    if not args.ingest and (args.output_dir or args.scratch_dir or args.chunk):
-        parser.error("--output-dir, --scratch-dir, and --chunk require --ingest")
+    if not args.ingest and (
+        args.output_dir or args.scratch_dir or args.chunk or args.keep_scratch
+    ):
+        parser.error("--output-dir, --scratch-dir, --keep-scratch, and --chunk require --ingest")
     logging.basicConfig(level=logging.INFO)
     filters = {
         name: getattr(args, name)
@@ -79,6 +86,7 @@ def main():
             args.output_dir,
             scratch_dir=args.scratch_dir,
             chunks=dict(args.chunk) or None,
+            keep_scratch=args.keep_scratch,
         )
         for dataset_id, store in stores.items():
             print(f"{dataset_id}\t{store}")

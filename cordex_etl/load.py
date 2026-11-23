@@ -71,12 +71,15 @@ def validate_checkpoint(store, manifest):
 def write_variable(dataset, variable, store, pending_path, chunks=None):
     """Add new arrays without rewriting shared arrays, then verify every new value."""
     dataset = dataset.copy()
-    # NetCDF storage encodings are not valid Zarr creation settings.
+    # NetCDF storage encodings are not valid Zarr creation settings. Chunked
+    # datetimes keep units and calendar, which xarray only accepts with a dtype.
     for name in dataset.variables:
+        datetime = dataset[name].dtype.kind in "mM"
         dataset[name].encoding = {
             key: value
             for key, value in dataset[name].encoding.items()
-            if key
+            if key == "dtype" and datetime
+            or key
             in (
                 "units",
                 "calendar",
@@ -111,17 +114,15 @@ def write_variable(dataset, variable, store, pending_path, chunks=None):
     # Fail closed after a crash: only the orchestrator clears this after commit.
     write_json(pending_path, {"variable": variable, "store": str(store)})
     if addition.variables:
-        addition.to_zarr(
-            store,
-            mode=mode,
-            zarr_format=3,
-            consolidated=False,
-            encoding={
-                name: {"chunks": tuple(axis[0] for axis in array.chunks)}
-                for name, array in addition.variables.items()
-                if array.chunks is not None
-            },
-        )
+        # The to_zarr encoding argument is strictly validated and replaces the
+        # variable encoding, so chunks go into the variable encoding instead.
+        for name, array in addition.variables.items():
+            if array.chunks is not None:
+                array.encoding = {
+                    **array.encoding,
+                    "chunks": tuple(axis[0] for axis in array.chunks),
+                }
+        addition.to_zarr(store, mode=mode, zarr_format=3, consolidated=False)
     with xr.open_zarr(
         store, consolidated=False, chunks={}, decode_coords="all"
     ) as written:
