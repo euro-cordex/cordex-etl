@@ -2,7 +2,7 @@
 
 CORDEX-CMIP6 ETL: discover datasets in the ESGF STAC catalog, group them, and
 load them incrementally into one Zarr v3 store per dataset. See
-[README.md](README.md) for usage and
+[README.md](README.md) and [docs/](docs) for usage, and
 [docs/ensemble-design.md](docs/ensemble-design.md) for the planned ensemble
 layer and open decisions.
 
